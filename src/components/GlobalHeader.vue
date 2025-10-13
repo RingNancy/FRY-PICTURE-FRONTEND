@@ -1,6 +1,7 @@
 <template>
   <div id="globalHeader">
-    <a-row :wrap="false">
+    <a-row :wrap="false" align="middle">
+      <!-- 左侧Logo和标题 -->
       <a-col flex="200px">
         <router-link to="/">
           <div class="title-bar">
@@ -9,6 +10,8 @@
           </div>
         </router-link>
       </a-col>
+
+      <!-- 中间菜单 -->
       <a-col flex="auto">
         <a-menu
           v-model:selectedKeys="current"
@@ -21,10 +24,10 @@
         <div class="user-login-status">
           <div v-if="loginUserStore.loginUser.id">
             <a-dropdown>
-              <ASpace>
+              <a-space>
                 <a-avatar :src="loginUserStore.loginUser.userAvatar" />
                 {{ loginUserStore.loginUser.userName ?? '无名' }}
-              </ASpace>
+              </a-space>
               <template #overlay>
                 <a-menu>
                   <a-menu-item>
@@ -64,6 +67,8 @@ import {
   InfoCircleOutlined,
   UserOutlined,
   MessageOutlined,
+  PushpinOutlined,
+  SearchOutlined,
 } from '@ant-design/icons-vue'
 import { type MenuProps, message } from 'ant-design-vue'
 import { useRouter } from 'vue-router'
@@ -71,6 +76,9 @@ import { LoginOutlined } from '@ant-design/icons-vue'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
 import { userLogoutUsingPost } from '@/api/userController.ts'
 import AuthModal from './AuthModal.vue'
+
+// 搜索文本
+const searchText = ref('')
 
 // 当前选中菜单
 const current = ref<string[]>([])
@@ -90,6 +98,12 @@ const items = computed<MenuProps['items']>(() => {
       title: '主页',
     },
     {
+      key: '/add_picture',
+      icon: () => h(PushpinOutlined),
+      label: '添加素材',
+      title: '添加素材',
+    },
+    {
       key: '/home',
       icon: () => h(AppstoreOutlined),
       label: '应用',
@@ -99,16 +113,44 @@ const items = computed<MenuProps['items']>(() => {
 
   // 只有管理员角色才显示用户管理菜单
   if (loginUserStore.loginUser.userRole === 'admin') {
-    baseItems.push({
-      key: '/admin/userManage',
-      icon: () => h(InfoCircleOutlined),
-      label: '用户管理',
-      title: '用户管理',
-    })
+    baseItems.push(
+      {
+        key: '/admin/userManage',
+        icon: () => h(InfoCircleOutlined),
+        label: '用户管理',
+        title: '用户管理',
+      },
+      {
+        key: '/admin/pictureManage',
+        icon: () => h(InfoCircleOutlined),
+        label: '素材管理',
+        title: '素材管理',
+      },
+    )
   }
 
   return baseItems
 })
+
+// 搜索处理
+const handleSearch = () => {
+  if (!searchText.value.trim()) {
+    message.warning('请输入搜索内容')
+    return
+  }
+
+  // 跳转到搜索结果页面，传递搜索参数
+  router.push({
+    path: '/search',
+    query: {
+      q: searchText.value.trim(),
+      from: 'header',
+    },
+  })
+
+  // 清空搜索框
+  searchText.value = ''
+}
 
 // 显示认证模态框
 const showAuthModal = () => {
@@ -131,8 +173,8 @@ const goToUserCenter = () => {
     name: '个人中心',
     params: {
       // 将ID转换为字符串，避免大数字精度丢失问题
-      id: loginUserStore.loginUser.id?.toString()
-    }
+      id: loginUserStore.loginUser.id?.toString(),
+    },
   })
 }
 
@@ -165,11 +207,19 @@ router.afterEach((to, from, next) => {
 </script>
 
 <style scoped>
+#globalHeader {
+  background: #fff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 0 24px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
 .title-bar {
   font-weight: bold;
   display: flex;
   align-items: center;
   justify-content: center;
+  height: 64px;
 }
 
 .title {
@@ -183,9 +233,103 @@ router.afterEach((to, from, next) => {
   height: 48px;
 }
 
+.search-section {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 64px;
+  padding: 0 16px;
+}
+
+.header-search {
+  width: 100%;
+  max-width: 280px;
+}
+
+.header-search :deep(.ant-input-group .ant-input) {
+  border-radius: 6px 0 0 6px;
+  border-right: none;
+}
+
+.header-search :deep(.ant-input-group .ant-btn) {
+  border-radius: 0 6px 6px 0;
+  border-left: none;
+}
+
 .user-login-status {
   font-weight: bold;
   text-align: center;
   align-items: center;
+  display: flex;
+  justify-content: center;
+  height: 64px;
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .search-section {
+    padding: 0 8px;
+  }
+
+  .header-search {
+    max-width: 240px;
+  }
+}
+
+@media (max-width: 992px) {
+  #globalHeader {
+    padding: 0 16px;
+  }
+
+  .search-section {
+    flex: 0 0 200px;
+  }
+
+  .header-search {
+    max-width: 200px;
+  }
+
+  .title {
+    font-size: 16px;
+    margin-left: 12px;
+  }
+
+  .logo {
+    height: 40px;
+  }
+}
+
+@media (max-width: 768px) {
+  #globalHeader {
+    padding: 0 12px;
+  }
+
+  .search-section {
+    flex: 0 0 180px;
+    padding: 0 4px;
+  }
+
+  .header-search {
+    max-width: 180px;
+  }
+
+  .title {
+    font-size: 14px;
+    margin-left: 8px;
+  }
+
+  .logo {
+    height: 36px;
+  }
+}
+
+@media (max-width: 576px) {
+  .search-section {
+    display: none;
+  }
+
+  .title-bar {
+    justify-content: flex-start;
+  }
 }
 </style>

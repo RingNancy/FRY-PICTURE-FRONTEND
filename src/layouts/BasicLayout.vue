@@ -22,20 +22,18 @@ import GlobalHeader from '@/components/GlobalHeader.vue'
 #basicLayout .footer {
   background: #efefef;
   padding: 16px;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
   text-align: center;
 }
+
 #basicLayout .content {
   background: #f0f2f5;
-  margin-bottom: 28px;
   padding: 20px;
   margin-top: 80px; /* 为固定头部留出空间 */
+  min-height: calc(100vh - 140px); /* 减去头部和页脚的高度 */
 }
+
 #basicLayout .header {
-  padding-inline: 10px;
+  padding-inline: 0px;
   color: unset;
   background: white;
   position: fixed;
