@@ -58,6 +58,7 @@
           :loading="loading"
           @change="doTableChange"
           :row-key="(record) => record.id"
+          :scroll="{ x: 1800 }"
         >
           <template #headerCell="{ column }">
             <template v-if="column.dataIndex === 'id'">
@@ -66,22 +67,38 @@
           </template>
           <template #bodyCell="{ column, record }">
             <template v-if="column.dataIndex === 'url'">
-              <a-image :src="record.url" :width="120" />
+              <a-image
+                :src="record.url"
+                :width="100"
+                :height="60"
+                style="object-fit: cover; border-radius: 4px"
+              />
             </template>
             <!-- 标签 -->
             <template v-if="column.dataIndex === 'tags'">
               <a-space wrap>
-                <a-tag v-for="tag in parseTags(record.tags)" :key="tag">{{ tag }}</a-tag>
+                <a-tag v-for="tag in parseTags(record.tags)" :key="tag" color="blue">{{
+                  tag
+                }}</a-tag>
               </a-space>
             </template>
             <!-- 图片信息 -->
             <template v-if="column.dataIndex === 'picInfo'">
-              <div>格式：{{ record.picFormat || 'N/A' }}</div>
-              <div>宽度：{{ record.picWidth || 'N/A' }}</div>
-              <div>高度：{{ record.picHeight || 'N/A' }}</div>
-              <div>宽高比：{{ record.picScale !== undefined ? record.picScale : 'N/A' }}</div>
-              <div>
-                大小：{{ record.picSize ? (record.picSize / 1024).toFixed(2) + 'KB' : 'N/A' }}
+              <div class="pic-info-item">
+                <span class="info-label">格式:</span>
+                <span class="info-value">{{ record.picFormat || 'N/A' }}</span>
+              </div>
+              <div class="pic-info-item">
+                <span class="info-label">尺寸:</span>
+                <span class="info-value"
+                  >{{ record.picWidth || 'N/A' }}×{{ record.picHeight || 'N/A' }}</span
+                >
+              </div>
+              <div class="pic-info-item">
+                <span class="info-label">大小:</span>
+                <span class="info-value">{{
+                  record.picSize ? (record.picSize / 1024).toFixed(2) + 'KB' : 'N/A'
+                }}</span>
               </div>
             </template>
             <template v-else-if="column.dataIndex === 'createTime'">
@@ -90,8 +107,44 @@
             <template v-else-if="column.dataIndex === 'editTime'">
               {{ formatTime(record.editTime) }}
             </template>
+            <!-- 审核信息 -->
+            <template v-if="column.dataIndex === 'reviewMessage'">
+              <div class="review-item">
+                <span class="review-label">状态:</span>
+                <span :class="getReviewStatusClass(record.reviewStatus)">
+                  {{ PIC_REVIEW_STATUS_MAP[record.reviewStatus] }}
+                </span>
+              </div>
+              <div class="review-item" v-if="record.reviewMessage">
+                <span class="review-label">信息:</span>
+                <span class="review-value">{{ record.reviewMessage }}</span>
+              </div>
+              <div class="review-item">
+                <span class="review-label">审核人:</span>
+                <a class="review-value">{{ reviewerNames[record.id] || '加载中...' }}</a>
+              </div>
+            </template>
+
             <template v-else-if="column.key === 'action'">
               <a-space>
+                <a-button
+                  v-if="record.reviewStatus !== PIC_REVIEW_STATUS_ENUM.PASS"
+                  type="link"
+                  size="small"
+                  @click="handleReview(record, PIC_REVIEW_STATUS_ENUM.PASS)"
+                  class="action-pass"
+                >
+                  通过
+                </a-button>
+                <a-button
+                  v-if="record.reviewStatus !== PIC_REVIEW_STATUS_ENUM.REJECT"
+                  type="link"
+                  size="small"
+                  @click="handleReview(record, PIC_REVIEW_STATUS_ENUM.REJECT)"
+                  class="action-reject"
+                >
+                  拒绝
+                </a-button>
                 <a-button type="primary" size="small" @click="handleEdit(record)">
                   <template #icon>
                     <EditOutlined />
@@ -116,7 +169,12 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { message, Modal } from 'ant-design-vue'
-import { deletePictureUsingPost, listPictureByPageUsingPost } from '@/api/pictureController.ts'
+import {
+  deletePictureUsingPost,
+  listPictureByPageUsingPost,
+  doPictureReviewUsingPost,
+} from '@/api/pictureController.ts'
+import { getUsernameById } from '@/utils'
 import dayjs from 'dayjs'
 import {
   SmileOutlined,
@@ -126,6 +184,7 @@ import {
   DeleteOutlined,
 } from '@ant-design/icons-vue'
 import router from '@/router'
+import { PIC_REVIEW_STATUS_MAP, PIC_REVIEW_STATUS_ENUM } from '@/constants/picture.ts'
 
 const columns = [
   {
@@ -133,58 +192,78 @@ const columns = [
     dataIndex: 'id',
     key: 'id',
     width: 80,
+    fixed: 'left',
   },
   {
     title: '图片',
     dataIndex: 'url',
     key: 'url',
+    width: 120,
+    fixed: 'left',
   },
   {
     title: '名称',
     dataIndex: 'name',
     key: 'name',
+    width: 150,
   },
   {
     title: '简介',
     dataIndex: 'introduction',
     key: 'introduction',
+    width: 200,
     ellipsis: true,
   },
   {
     title: '类型',
     dataIndex: 'category',
     key: 'category',
+    width: 120,
   },
   {
     title: '标签',
     dataIndex: 'tags',
     key: 'tags',
+    width: 200,
   },
   {
     title: '图片信息',
     dataIndex: 'picInfo',
     key: 'picInfo',
+    width: 180,
   },
   {
-    title: '用户 ID',
+    title: '上传用户',
     dataIndex: 'userId',
     key: 'userId',
-    width: 80,
+    width: 120,
+    customRender: ({ record }) => {
+      return userNames[record.id] || '加载中...'
+    },
   },
   {
     title: '创建时间',
     dataIndex: 'createTime',
     key: 'createTime',
+    width: 160,
   },
   {
     title: '编辑时间',
     dataIndex: 'editTime',
     key: 'editTime',
+    width: 160,
+  },
+  {
+    title: '审核信息',
+    dataIndex: 'reviewMessage',
+    key: 'reviewMessage',
+    width: 250,
   },
   {
     title: '操作',
     key: 'action',
     width: 200,
+    fixed: 'right',
   },
 ]
 
@@ -192,6 +271,9 @@ const columns = [
 const dataList = ref<API.Picture[]>([])
 const total = ref(0)
 const loading = ref(false)
+// 用户名映射
+const userNames = reactive<Record<number, string>>({})
+const reviewerNames = reactive<Record<number, string>>({})
 
 // 搜索条件
 const searchParams = reactive<API.PictureQueryRequest>({
@@ -212,6 +294,17 @@ const pagination = computed(() => {
   }
 })
 
+// 获取审核状态的样式类
+const getReviewStatusClass = (status: number | undefined) => {
+  if (status === PIC_REVIEW_STATUS_ENUM.PASS) {
+    return 'status-pass'
+  } else if (status === PIC_REVIEW_STATUS_ENUM.REJECT) {
+    return 'status-reject'
+  } else {
+    return 'status-default'
+  }
+}
+
 // 获取数据
 const fetchData = async () => {
   loading.value = true
@@ -223,6 +316,9 @@ const fetchData = async () => {
       // 现在后端返回的是分页对象，需要正确处理
       dataList.value = res.data.data.records || []
       total.value = res.data.data.total || 0
+
+      // 获取涉及的用户信息
+      await fetchUsersInfo(dataList.value)
     } else {
       message.error('获取数据失败，' + (res.data.message || '未知错误'))
       dataList.value = []
@@ -236,6 +332,47 @@ const fetchData = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// 批量获取用户信息
+const fetchUsersInfo = async (pictures: API.Picture[]) => {
+  // 创建获取用户名的Promise数组
+  const userPromises: Promise<void>[] = []
+
+  pictures.forEach((picture) => {
+    // 获取上传用户名称
+    if (picture.userId) {
+      const userId = picture.userId
+      const pictureId = picture.id!
+
+      // 如果还没有获取过该用户名称，则添加获取任务
+      if (!userNames[pictureId]) {
+        userPromises.push(
+          getUsernameById(userId).then((name) => {
+            userNames[pictureId] = name
+          }),
+        )
+      }
+    }
+
+    // 获取审核人名称
+    if (picture.reviewerId) {
+      const reviewerId = picture.reviewerId
+      const pictureId = picture.id!
+
+      // 如果还没有获取过该审核人名称，则添加获取任务
+      if (!reviewerNames[pictureId]) {
+        userPromises.push(
+          getUsernameById(reviewerId).then((name) => {
+            reviewerNames[pictureId] = name
+          }),
+        )
+      }
+    }
+  })
+
+  // 并行执行所有获取用户名的Promise
+  await Promise.all(userPromises)
 }
 
 // 页面加载时请求一次
@@ -294,6 +431,23 @@ const doDelete = async (id: number) => {
       }
     },
   })
+}
+
+const handleReview = async (record: API.Picture, reviewStatus: number) => {
+  const reviewMessage =
+    reviewStatus === PIC_REVIEW_STATUS_ENUM.PASS ? '管理员操作通过' : '管理员操作拒绝'
+  const res = await doPictureReviewUsingPost({
+    id: record.id,
+    reviewStatus,
+    reviewMessage,
+  })
+  if (res.data.code === 0) {
+    message.success('审核操作成功')
+    // 重新获取列表
+    fetchData()
+  } else {
+    message.error('审核操作失败，' + res.data.message)
+  }
 }
 
 // 处理新增图片
@@ -374,7 +528,7 @@ const parseTags = (tags: string | undefined) => {
 }
 
 .tableBlock {
-  padding: 24px 0;
+  padding: 16px 0;
 }
 
 :deep(.ant-table-thead > tr > th) {
@@ -393,5 +547,88 @@ const parseTags = (tags: string | undefined) => {
 .avatar-cell {
   display: flex;
   align-items: center;
+}
+
+.pic-info-item {
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.pic-info-item:last-child {
+  margin-bottom: 0;
+}
+
+.info-label {
+  font-weight: 500;
+  width: 40px;
+  display: inline-block;
+}
+
+.info-value {
+  margin-left: 4px;
+}
+
+.review-item {
+  margin-bottom: 4px;
+  display: flex;
+  align-items: flex-start;
+}
+
+.review-item:last-child {
+  margin-bottom: 0;
+}
+
+.review-label {
+  font-weight: 500;
+  width: 50px;
+  display: inline-block;
+}
+
+.review-value {
+  margin-left: 4px;
+  flex: 1;
+  word-break: break-all;
+}
+
+:deep(.ant-table-tbody > tr > td) {
+  padding: 12px 8px;
+}
+
+:deep(.ant-table-thead > tr > th) {
+  padding: 12px 8px;
+}
+
+/* 审核状态样式 */
+.status-pass {
+  color: #52c41a;
+  font-weight: 500;
+}
+
+.status-reject {
+  color: #ff4d4f;
+  font-weight: 500;
+}
+
+.status-default {
+  color: #faad14;
+  font-weight: 500;
+}
+
+/* 操作按钮样式 */
+.action-pass {
+  color: #52c41a !important;
+}
+
+.action-reject {
+  color: #ff4d4f !important;
+}
+
+.action-pass:hover {
+  color: #73d13d !important;
+}
+
+.action-reject:hover {
+  color: #ff7875 !important;
 }
 </style>
