@@ -1,5 +1,6 @@
 import { saveAs } from 'file-saver'
 import { getPictureVoByIdUsingGet } from '@/api/pictureController.ts'
+import { getUserByIdUsingGet } from '@/api/userController.ts'
 import { useLoginUserStore } from '@/stores/useLoginUserStore'
 
 /**
@@ -56,5 +57,48 @@ export const isPictureOwnerOrAdmin = async (pictureId: number): Promise<boolean>
   } catch (error) {
     console.error('判断用户权限时出错:', error)
     return false
+  }
+}
+
+/**
+ * 用户信息缓存
+ */
+const userCache = new Map<number, string>()
+
+/**
+ * 根据用户ID获取用户名
+ * @param userId 用户ID
+ * @returns Promise<string> 用户名
+ */
+export const getUsernameById = async (userId: number | undefined): Promise<string> => {
+  // 检查用户ID是否存在
+  if (!userId) {
+    return 'N/A'
+  }
+
+  // 检查缓存中是否已存在用户名
+  if (userCache.has(userId)) {
+    return userCache.get(userId)!
+  }
+
+  try {
+    // 调用API获取用户信息
+    const res = await getUserByIdUsingGet({ id: userId })
+    
+    if (res.data.code === 0 && res.data.data) {
+      const username = res.data.data.userName || `用户${userId}`
+      // 将用户名存入缓存
+      userCache.set(userId, username)
+      return username
+    } else {
+      const unknownUser = `用户${userId}`
+      userCache.set(userId, unknownUser)
+      return unknownUser
+    }
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+    const errorUser = `用户${userId}`
+    userCache.set(userId, errorUser)
+    return errorUser
   }
 }

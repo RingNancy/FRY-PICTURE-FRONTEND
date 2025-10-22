@@ -5,7 +5,7 @@ import UserCenterPage from '@/page/user/UserCenterPage.vue'
 import UserEditPage from '@/page/user/UserEditPage.vue'
 import AdminUserEditPage from '@/page/admin/AdminUserEditPage.vue'
 import AddPicturePage from '@/page/picture/AddPicturePage.vue'
-import ManagePicturePage from '@/page/picture/ManagePicturePage.vue'
+import ManagePicturePage from '@/page/admin/ManagePicturePage.vue'
 import ViewPicturePage from '@/page/picture/ViewPicturePage.vue'
 import EditPicturePage from '@/page/picture/EditPicturePage.vue'
 
