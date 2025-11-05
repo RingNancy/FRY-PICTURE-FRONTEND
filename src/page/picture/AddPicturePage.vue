@@ -5,44 +5,66 @@
         <div class="card-title">
           <FileImageOutlined />
           <span>创建图片</span>
+          <!-- 上传方式选择 - 放在标题栏 -->
+          <a-tabs v-model:activeKey="uploadMethod" class="upload-method-tabs-in-title" size="small">
+            <a-tab-pane key="local" tab="本地上传" />
+            <a-tab-pane key="url" tab="URL上传" />
+          </a-tabs>
         </div>
       </template>
-      
+
       <a-row :gutter="24" class="main-content">
         <a-col :span="24" :md="12">
-          <div class="upload-section">
+          <div class="upload-section" :class="{ 'url-upload-mode': uploadMethod === 'url' }">
             <div class="upload-header">
-              <h3>上传图片</h3>
-              <p>请选择高质量图片文件</p>
+              <h3>{{ uploadMethod === 'local' ? '上传图片' : '解析图片' }}</h3>
+              <p>{{ uploadMethod === 'local' ? '请选择高质量图片文件' : '请输入图片URL地址' }}</p>
             </div>
-            <UploadPicture :picture="picture" :onSuccess="onSuccess" />
+
+            <!-- 上传组件 -->
+            <UploadPicture
+              v-if="uploadMethod === 'local'"
+              :picture="picture"
+              :onSuccess="onSuccess"
+            />
+            <UrlUploadPicture
+              v-else
+              :picture="picture"
+              :onSuccess="onUrlUploadSuccess"
+              mode="parse"
+            />
+
+            <!-- URL上传的图片预览容器 -->
+            <div v-if="uploadMethod === 'url' && picture?.url" class="url-preview-container">
+              <img :src="picture.url" alt="Preview" class="url-preview-image" />
+            </div>
           </div>
         </a-col>
-        
+
         <a-col :span="24" :md="12">
           <div class="form-section">
-            <a-form 
-              v-if="picture" 
-              layout="vertical" 
-              :model="pictureForm" 
+            <a-form
+              v-if="picture"
+              layout="vertical"
+              :model="pictureForm"
               @finish="handleSubmit"
               class="picture-form"
             >
-              <a-form-item 
-                label="名称" 
+              <a-form-item
+                label="名称"
                 name="name"
                 :rules="[{ required: true, message: '请输入图片名称' }]"
               >
-                <a-input 
-                  v-model:value="pictureForm.name" 
-                  placeholder="请输入图片名称" 
+                <a-input
+                  v-model:value="pictureForm.name"
+                  placeholder="请输入图片名称"
                   size="large"
                   class="custom-input"
                 />
               </a-form-item>
-              
-              <a-form-item 
-                label="简介" 
+
+              <a-form-item
+                label="简介"
                 name="introduction"
                 :rules="[{ required: true, message: '请输入图片简介' }]"
               >
@@ -54,7 +76,7 @@
                   class="custom-textarea"
                 />
               </a-form-item>
-              
+
               <a-form-item label="分类" name="category">
                 <a-auto-complete
                   v-model:value="pictureForm.category"
@@ -69,7 +91,7 @@
                   </template>
                 </a-auto-complete>
               </a-form-item>
-              
+
               <a-form-item label="标签" name="tags">
                 <a-select
                   v-model:value="pictureForm.tags"
@@ -85,12 +107,12 @@
                   </template>
                 </a-select>
               </a-form-item>
-              
+
               <a-form-item class="submit-button">
-                <a-button 
-                  type="primary" 
-                  html-type="submit" 
-                  size="large" 
+                <a-button
+                  type="primary"
+                  html-type="submit"
+                  size="large"
                   block
                   :loading="submitting"
                   class="submit-btn"
@@ -99,10 +121,10 @@
                 </a-button>
               </a-form-item>
             </a-form>
-            
+
             <div v-else class="placeholder-text">
               <FileImageOutlined class="placeholder-icon" />
-              <p>请先上传图片</p>
+              <p>{{ uploadMethod === 'local' ? '请先上传图片' : '请先解析图片' }}</p>
             </div>
           </div>
         </a-col>
@@ -113,11 +135,17 @@
 
 <script setup lang="ts">
 import UploadPicture from '@/components/UploadPicture.vue'
-import { onMounted, reactive, ref, computed } from 'vue'
-import { editPictureUsingPost, listPictureTagCategoryUsingGet, uploadPictureUsingPost } from '@/api/pictureController.ts'
+import { onMounted, reactive, ref } from 'vue'
+import {
+  editPictureUsingPost,
+  listPictureTagCategoryUsingGet,
+  uploadPictureUsingPost,
+  uploadPictureByUrlUsingPost,
+} from '@/api/pictureController.ts'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { FileImageOutlined } from '@ant-design/icons-vue'
+import UrlUploadPicture from '@/components/UrlUploadPicture.vue'
 
 const picture = ref<API.PictureVO>()
 const submitting = ref(false)
@@ -125,18 +153,28 @@ const pictureForm = reactive<API.PictureEditRequest>({
   name: '',
   introduction: '',
   category: '',
-  tags: []
+  tags: [],
 })
 const selectedFile = ref<File | null>(null)
-const uploadPictureRef = ref()
+const uploadMethod = ref<'local' | 'url'>('local')
 
 const onSuccess = (file: File, previewUrl: string) => {
   // 保存选中的文件
   selectedFile.value = file
   // 创建一个临时的picture对象用于预览
   picture.value = {
-    url: previewUrl
+    url: previewUrl,
   } as API.PictureVO
+}
+
+/**
+ * URL上传成功回调
+ * @param newPicture
+ */
+const onUrlUploadSuccess = (newPicture: API.PictureVO) => {
+  picture.value = newPicture
+  // URL上传不需要selectedFile，因为文件已经在服务端
+  selectedFile.value = null
 }
 
 const router = useRouter()
@@ -146,32 +184,59 @@ const router = useRouter()
  * @param values
  */
 const handleSubmit = async (values: any) => {
-  if (!selectedFile.value) {
+  if (!selectedFile.value && !picture.value?.url) {
     message.error('请先上传图片')
     return
   }
-  
+
   submitting.value = true
   try {
-    // 先上传图片
-    const uploadParams = picture.value?.id ? { id: picture.value.id } : {}
-    const uploadRes = await uploadPictureUsingPost(uploadParams, {}, selectedFile.value)
-    
-    if (uploadRes.data.code !== 0 || !uploadRes.data.data) {
-      message.error('图片上传失败，' + uploadRes.data.message)
+    let uploadedPicture
+
+    // 如果有本地文件需要上传
+    if (selectedFile.value) {
+      // 先上传图片
+      const uploadParams = picture.value?.id ? { id: picture.value.id } : {}
+      const uploadRes = await uploadPictureUsingPost(uploadParams, {}, selectedFile.value)
+
+      if (uploadRes.data.code !== 0 || !uploadRes.data.data) {
+        message.error('图片上传失败，' + uploadRes.data.message)
+        return
+      }
+
+      uploadedPicture = uploadRes.data.data
+    } else if (picture.value?.url) {
+      // URL上传的图片需要检查是否已经上传到服务器
+      // 如果是通过URL解析模式添加的，需要先上传
+      if (uploadMethod.value === 'url') {
+        const uploadRes = await uploadPictureByUrlUsingPost({
+          fileUrl: picture.value.url,
+        })
+
+        if (uploadRes.data.code !== 0 || !uploadRes.data.data) {
+          message.error('图片上传失败，' + uploadRes.data.message)
+          return
+        }
+
+        uploadedPicture = uploadRes.data.data
+      } else {
+        // 已经存在于服务器上的图片
+        uploadedPicture = picture.value
+      }
+    } else {
+      message.error('图片信息异常')
       return
     }
-    
-    // 获取上传后的图片信息
-    const uploadedPicture = uploadRes.data.data
+
+    // 获取图片ID
     const pictureId = uploadedPicture.id
-    
+
     // 然后更新图片信息
     const res = await editPictureUsingPost({
       id: pictureId,
       ...values,
     })
-    
+
     if (res.data.code === 0 && res.data.data) {
       message.success('创建成功')
       // 跳转到图片详情页
@@ -229,12 +294,6 @@ onMounted(() => {
   padding: 0 16px;
 }
 
-.upload-card {
-  border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-  border: none;
-}
-
 .card-title {
   display: flex;
   align-items: center;
@@ -242,6 +301,25 @@ onMounted(() => {
   font-size: 20px;
   font-weight: 600;
   color: #333;
+}
+
+.upload-method-tabs-in-title {
+  margin-left: auto;
+}
+
+.upload-method-tabs-in-title :deep(.ant-tabs-nav) {
+  margin-bottom: 0;
+}
+
+.upload-method-tabs-in-title :deep(.ant-tabs-tab) {
+  font-size: 14px;
+  padding: 8px 16px;
+}
+
+.upload-card {
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  border: none;
 }
 
 .main-content {
@@ -259,10 +337,38 @@ onMounted(() => {
   transition: all 0.3s ease;
 }
 
-.upload-section:hover {
+/* URL上传模式下不需要虚线框，移除默认的虚线框样式 */
+.upload-section.url-upload-mode {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+
+.url-preview-container {
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4edf9 100%);
+  border-radius: 12px;
+  border: 2px dashed #a3c4f3;
+  padding: 24px;
+  margin-top: 16px;
+  transition: all 0.3s ease;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.url-preview-container:hover {
   background: linear-gradient(135deg, #eef2f7 0%, #d8e6f5 100%);
   border-color: #6aa1ef;
   box-shadow: 0 4px 12px rgba(106, 161, 239, 0.2);
+}
+
+.url-preview-image {
+  max-width: 100%;
+  max-height: 300px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .upload-header {
@@ -370,24 +476,24 @@ onMounted(() => {
     margin: 12px auto;
     padding: 0 12px;
   }
-  
+
   .upload-card {
     padding: 16px;
   }
-  
+
   .upload-section {
     min-height: 300px;
     padding: 16px;
   }
-  
+
   .placeholder-text {
     min-height: 250px;
   }
-  
+
   .picture-form {
     padding: 16px;
   }
-  
+
   .upload-header h3 {
     font-size: 18px;
   }

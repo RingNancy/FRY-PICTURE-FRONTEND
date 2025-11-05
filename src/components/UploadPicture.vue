@@ -52,14 +52,14 @@ const handleFileSelect = ({ file }: any) => {
   if (previewUrl.value) {
     URL.revokeObjectURL(previewUrl.value)
   }
-  
+
   loading.value = true
   try {
     // 创建本地预览URL
     const url = URL.createObjectURL(file)
     previewUrl.value = url
     selectedFile.value = file
-    
+
     // 将文件和预览URL传递给父组件
     props.onSuccess?.(file, url)
   } catch (error) {
@@ -71,7 +71,7 @@ const handleFileSelect = ({ file }: any) => {
 
 // 暴露方法给父组件，用于获取选中的文件
 defineExpose({
-  getSelectedFile: () => selectedFile.value
+  getSelectedFile: () => selectedFile.value,
 })
 </script>
 

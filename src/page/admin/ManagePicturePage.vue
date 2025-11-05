@@ -49,6 +49,12 @@
           </template>
           新增图片
         </a-button>
+        <a-button type="dashed" style="margin-left: 12px" @click="showBatchModal = true">
+          <template #icon>
+            <PlusOutlined />
+          </template>
+          批量添加
+        </a-button>
       </template>
       <div class="tableBlock">
         <a-table
@@ -163,6 +169,12 @@
         </a-table>
       </div>
     </a-card>
+    
+    <!-- 添加批量上传模态框组件 -->
+    <UploadPictureByBatch 
+      v-model:visible="showBatchModal" 
+      @success="handleBatchSuccess" 
+    />
   </div>
 </template>
 
@@ -185,6 +197,9 @@ import {
 } from '@ant-design/icons-vue'
 import router from '@/router'
 import { PIC_REVIEW_STATUS_MAP, PIC_REVIEW_STATUS_ENUM } from '@/constants/picture.ts'
+
+// 添加导入语句
+import UploadPictureByBatch from '@/components/UploadPictureByBatch.vue'
 
 const columns = [
   {
@@ -271,6 +286,8 @@ const columns = [
 const dataList = ref<API.Picture[]>([])
 const total = ref(0)
 const loading = ref(false)
+// 控制批量添加模态框显示
+const showBatchModal = ref(false)
 // 用户名映射
 const userNames = reactive<Record<number, string>>({})
 const reviewerNames = reactive<Record<number, string>>({})
@@ -453,6 +470,12 @@ const handleReview = async (record: API.Picture, reviewStatus: number) => {
 // 处理新增图片
 const handleAddPicture = () => {
   router.push('/add_picture')
+}
+
+// 批量添加成功回调
+const handleBatchSuccess = () => {
+  // 重新获取数据
+  fetchData()
 }
 
 // 处理编辑图片
